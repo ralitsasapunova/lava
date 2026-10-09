@@ -74,6 +74,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   gap: calc(var(--u) * 14px);
   padding: calc(var(--u) * 24px);
   overflow: auto;
+  touch-action: pan-y;
   text-align: center;
   background: linear-gradient(180deg, var(--veil-a), var(--veil-b));
 }
@@ -133,7 +134,7 @@ h2 { font-size: calc(var(--u) * 46px); }
 .score-big {
   margin: 0;
   font-family: var(--font-display);
-  font-size: calc(var(--u) * 84px);
+  font-size: calc(var(--u) * 64px);
   line-height: 1;
   color: var(--ash);
   font-variant-numeric: tabular-nums;
@@ -172,8 +173,81 @@ h2 { font-size: calc(var(--u) * 46px); }
   cursor: pointer;
 }
 .sound[aria-pressed="false"] { color: var(--muted); }
+
+.name-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 6px);
+  width: min(100%, calc(var(--u) * 300px));
+}
+.name-row label {
+  font-size: max(11px, calc(var(--u) * 12px));
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.name-row input {
+  width: 100%;
+  padding: 0.6em 0.8em;
+  border: 2px solid #5a3a2a;
+  border-radius: 10px;
+  font: 500 max(16px, calc(var(--u) * 18px)) var(--font-body);
+  text-align: center;
+  color: var(--ash);
+  background: rgba(255, 255, 255, 0.07);
+}
+.name-row input::placeholder { color: var(--muted); opacity: 0.8; }
+.name-row input:focus-visible { outline: 3px solid var(--molten); outline-offset: 2px; border-color: var(--molten); }
+.name-row input.need { border-color: var(--lava); animation: nudge 0.3s 2; }
+@keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.link {
+  padding: 0.4em 0.8em;
+  border: 0;
+  background: none;
+  font: 700 max(13px, calc(var(--u) * 15px)) / 1.2 var(--font-body);
+  letter-spacing: 0.04em;
+  color: var(--molten);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+.link:hover { color: var(--ash); }
+.link:focus-visible { outline: 3px solid var(--molten); outline-offset: 3px; border-radius: 6px; }
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 4px);
+  width: min(100%, calc(var(--u) * 330px));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: max(13px, calc(var(--u) * 15px));
+}
+.board li {
+  display: grid;
+  grid-template-columns: 2.2em minmax(0, 1fr) auto;
+  gap: 0.6em;
+  align-items: baseline;
+  padding: 0.32em 0.7em;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.board li.me { background: rgba(255, 194, 51, 0.18); color: var(--molten); }
+.board li.empty { display: block; text-align: center; color: var(--muted); background: none; }
+.board .rk { color: var(--muted); font-variant-numeric: tabular-nums; }
+.board li.me .rk { color: inherit; }
+.board .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .sc { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.board-note { margin: 0; font-size: max(11px, calc(var(--u) * 13px)); color: var(--muted); }
+#overScreen { gap: calc(var(--u) * 10px); }
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: none; }
+  .name-row input.need { animation: none; }
 }
 </style>
 </head>
@@ -188,11 +262,15 @@ h2 { font-size: calc(var(--u) * 46px); }
       <dl class="how">
         <dt>Move</dt><dd>Arrow keys or A / D. On a phone, drag.</dd>
         <dt>Jump</dt><dd>Space or Up. On a phone, tap.</dd>
-        <dt>Warning</dt><dd>An ember on the ceiling shows where lava will land. Puddles only burn if you stand in them.</dd>
-        <dt>Gems</dt><dd>Worth 50 points. Every fifth one heals a heart.</dd>
+        <dt>Tips</dt><dd>Embers on the ceiling show where lava lands. Puddles only burn if you stand in them. Gems give 50 points and every fifth heals a heart.</dd>
       </dl>
+      <div class="name-row">
+        <label for="nameInput">Your name</label>
+        <input id="nameInput" type="text" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" placeholder="Pick a nickname">
+      </div>
       <button class="btn" id="playBtn" type="button">Play</button>
-      <p class="meta">Best score: <span id="bestStart">0</span></p>
+      <button class="link" id="boardBtn" type="button">Leaderboard</button>
+      <p class="meta">Your best: <span id="bestStart">0</span></p>
     </section>
 
     <section class="screen" id="overScreen" hidden>
@@ -200,7 +278,17 @@ h2 { font-size: calc(var(--u) * 46px); }
       <p class="score-big"><span id="finalScore">0</span><small>points</small></p>
       <p class="newbest" id="newBest" hidden>New best score!</p>
       <p class="meta" id="finalStats"></p>
+      <ol class="board" id="overBoard"></ol>
+      <p class="board-note" id="overNote"></p>
       <button class="btn" id="againBtn" type="button">Play again</button>
+      <button class="link" id="renameBtn" type="button">Change name</button>
+    </section>
+
+    <section class="screen" id="boardScreen" hidden>
+      <h2>Leaderboard</h2>
+      <ol class="board" id="fullBoard"></ol>
+      <p class="board-note" id="fullNote"></p>
+      <button class="btn" id="boardBack" type="button">Back</button>
     </section>
 
     <button class="sound" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
@@ -210,6 +298,10 @@ h2 { font-size: calc(var(--u) * 46px); }
 <script>
 (() => {
   'use strict';
+
+  // Shared leaderboard: paste your Google Apps Script web app URL between the quotes (it ends in /exec).
+  // Leave it empty and scores are kept on each device only.
+  const LEADERBOARD_URL = '';
 
   const W = 480, H = 720, CEIL = 62, GY = H - 118;
   const MOVE = 330, GRAV = 1900, JUMP = 720;
@@ -221,6 +313,8 @@ h2 { font-size: calc(var(--u) * 46px); }
   const playBtn = $('playBtn'), againBtn = $('againBtn'), soundBtn = $('soundBtn');
   const bestStart = $('bestStart'), overTitle = $('overTitle'), finalScore = $('finalScore');
   const newBestEl = $('newBest'), finalStats = $('finalStats');
+  const nameInput = $('nameInput'), boardBtn = $('boardBtn'), boardScreen = $('boardScreen'), boardBack = $('boardBack');
+  const fullBoard = $('fullBoard'), fullNote = $('fullNote'), overBoard = $('overBoard'), overNote = $('overNote'), renameBtn = $('renameBtn');
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(W * dpr);
@@ -345,11 +439,95 @@ h2 { font-size: calc(var(--u) * 46px); }
   }
   soundBtn.addEventListener('click', () => { ensureAudio(); setSound(muted); soundBtn.blur(); });
 
-  /* ---------- best score (per device) ---------- */
-  function loadBest() { try { return parseInt(localStorage.getItem('lavaDodgeBest') || '0', 10) || 0; } catch (e) { return 0; } }
-  function saveBest(v) { try { localStorage.setItem('lavaDodgeBest', String(v)); } catch (e) { /* ignore */ } }
-  let best = loadBest();
+  /* ---------- names, scores and the leaderboard ---------- */
+  function cleanName(s) { return String(s || '').replace(/[<>\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16); }
+  function loadName() { try { return cleanName(localStorage.getItem('lavaDodgeName') || ''); } catch (e) { return ''; } }
+  function saveName(n) { try { localStorage.setItem('lavaDodgeName', n); } catch (e) { /* ignore */ } }
+  function localBoard() {
+    try { const v = JSON.parse(localStorage.getItem('lavaDodgeScores') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function bestFor(name) {
+    const k = name.toLowerCase();
+    const e = localBoard().find((x) => String(x.name).toLowerCase() === k);
+    return e ? Number(e.score) || 0 : 0;
+  }
+  function recordLocal(res) {
+    const list = localBoard();
+    const k = res.name.toLowerCase();
+    const ex = list.find((x) => String(x.name).toLowerCase() === k);
+    if (ex) { if (res.score > ex.score) { ex.score = res.score; ex.name = res.name; } }
+    else list.push({ name: res.name, score: res.score });
+    list.sort((a, b) => b.score - a.score);
+    try { localStorage.setItem('lavaDodgeScores', JSON.stringify(list.slice(0, 20))); } catch (e) { /* ignore */ }
+  }
+
+  let playerName = loadName();
+  nameInput.value = playerName;
+  let best = bestFor(playerName);
   bestStart.textContent = String(best);
+  nameInput.addEventListener('input', () => { best = bestFor(cleanName(nameInput.value)); bestStart.textContent = String(best); });
+
+  function withTimeout(ms) {
+    const c = new AbortController();
+    const id = setTimeout(() => c.abort(), ms);
+    return { signal: c.signal, done: () => clearTimeout(id) };
+  }
+  function fetchRemote() {
+    if (!LEADERBOARD_URL) return Promise.reject(new Error('not set up'));
+    const to = withTimeout(8000);
+    const url = LEADERBOARD_URL + (LEADERBOARD_URL.indexOf('?') < 0 ? '?' : '&') + 'action=top&t=' + Date.now();
+    return fetch(url, { signal: to.signal })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j || !Array.isArray(j.top)) throw new Error('bad reply');
+        return j.top.map((x) => ({ name: cleanName(x.name), score: Math.floor(Number(x.score)) || 0 }));
+      })
+      .finally(to.done);
+  }
+  function sendRemote(res) {
+    if (!LEADERBOARD_URL) return Promise.resolve();
+    const to = withTimeout(8000);
+    return fetch(LEADERBOARD_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(res), signal: to.signal })
+      .finally(to.done);
+  }
+
+  function renderBoard(ol, rows, limit) {
+    ol.textContent = '';
+    if (!rows.length) {
+      const li = document.createElement('li');
+      li.className = 'empty'; li.textContent = 'No scores yet. Be the first!';
+      ol.appendChild(li);
+      return;
+    }
+    const me = playerName.toLowerCase();
+    rows.slice(0, limit).forEach((r, i) => {
+      const li = document.createElement('li');
+      if (r.name.toLowerCase() === me) li.className = 'me';
+      const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = String(i + 1);
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+      const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = String(r.score);
+      li.append(rk, nm, sc);
+      ol.appendChild(li);
+    });
+  }
+  // Shows the shared board when it can be reached, otherwise this device's scores.
+  function showBoard(ol, note, limit, before) {
+    const mine = (ol._seq = (ol._seq || 0) + 1);
+    ol.textContent = '';
+    const li = document.createElement('li');
+    li.className = 'empty'; li.textContent = 'Loading scores…';
+    ol.appendChild(li);
+    note.textContent = '';
+    Promise.resolve(before).catch(() => {}).then(() => fetchRemote()).then((rows) => {
+      if (ol._seq !== mine) return;
+      renderBoard(ol, rows, limit);
+      note.textContent = 'Shared leaderboard';
+    }).catch(() => {
+      if (ol._seq !== mine) return;
+      renderBoard(ol, localBoard(), limit);
+      note.textContent = LEADERBOARD_URL ? "Couldn't reach the shared leaderboard. Showing scores from this device." : 'Scores are saved on this device only.';
+    });
+  }
 
   /* ---------- game state ---------- */
   let state = 'menu';            // menu | play | pause | over
@@ -374,6 +552,16 @@ h2 { font-size: calc(var(--u) * 46px); }
 
   function startGame() {
     if (state === 'play' || state === 'pause') return;
+    if (!boardScreen.hidden) return;
+    const n = cleanName(nameInput.value);
+    if (!n) {
+      nameInput.classList.add('need');
+      try { nameInput.focus(); } catch (e) { /* ignore */ }
+      setTimeout(() => nameInput.classList.remove('need'), 700);
+      return;
+    }
+    playerName = n; nameInput.value = n; saveName(n);
+    best = bestFor(n);
     ensureAudio();
     reset();
     state = 'play';
@@ -402,13 +590,16 @@ h2 { font-size: calc(var(--u) * 46px); }
     state = 'over'; dead = true; overReady = false;
     const sc = curScore();
     let isNew = false;
-    if (sc > best) { best = sc; isNew = true; saveBest(best); }
+    if (sc > best) { best = sc; isNew = true; }
+    const result = { name: playerName, score: sc, seconds: Math.floor(t), gems: gemCount };
+    recordLocal(result);
+    showBoard(overBoard, overNote, 5, sendRemote(result));
     burstParts(P.x, P.y - 24, 34, ['#ff6a2a', '#ffc233', '#4f8cff', '#f6e9df'], 260);
     tone(330, 50, 0.8, 'sawtooth', 0.1);
     overTitle.textContent = sc >= 500 ? 'Lava legend!' : sc >= 250 ? 'Nice run!' : sc >= 100 ? 'Toasty!' : 'Burned!';
     finalScore.textContent = String(sc);
     newBestEl.hidden = !isNew;
-    finalStats.textContent = 'Survived ' + Math.floor(t) + ' s · ' + gemCount + ' gem' + (gemCount === 1 ? '' : 's') + ' · Best ' + best;
+    finalStats.textContent = playerName + ' · Survived ' + Math.floor(t) + ' s · ' + gemCount + ' gem' + (gemCount === 1 ? '' : 's') + ' · Best ' + best;
     bestStart.textContent = String(best);
     setTimeout(() => {
       if (state === 'over') {
@@ -799,6 +990,10 @@ h2 { font-size: calc(var(--u) * 46px); }
 
   /* ---------- input ---------- */
   window.addEventListener('keydown', (e) => {
+    if (e.target && e.target.tagName === 'INPUT') {
+      if (e.key === 'Enter') { e.preventDefault(); startGame(); }
+      return;
+    }
     const k = e.key;
     if (k === 'ArrowLeft' || k === 'a' || k === 'A') { keys.left = true; e.preventDefault(); }
     else if (k === 'ArrowRight' || k === 'd' || k === 'D') { keys.right = true; e.preventDefault(); }
@@ -822,6 +1017,16 @@ h2 { font-size: calc(var(--u) * 46px); }
 
   playBtn.addEventListener('click', startGame);
   againBtn.addEventListener('click', startGame);
+  boardBtn.addEventListener('click', () => {
+    startScreen.hidden = true; boardScreen.hidden = false;
+    showBoard(fullBoard, fullNote, 10);
+  });
+  boardBack.addEventListener('click', () => { boardScreen.hidden = true; startScreen.hidden = false; });
+  renameBtn.addEventListener('click', () => {
+    reset(); state = 'menu';
+    overScreen.hidden = true; startScreen.hidden = false;
+    try { nameInput.focus(); nameInput.select(); } catch (e) { /* ignore */ }
+  });
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
